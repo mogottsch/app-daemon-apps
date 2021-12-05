@@ -1,0 +1,64 @@
+---
+bedroom_remote:
+  module: controllerx
+  class: E1743Controller
+  controller: sensor.bedroom_remote_action
+  integration: z2m
+  light: light.bedroom_lamp
+  mapping:
+    "on": toggle
+    "off": toggle
+    "brightness_move_up": hold_brightness_up
+    "brightness_move_down": hold_brightness_down
+    "brightness_stop": release
+
+livingroom_remote:
+  module: controllerx
+  class: E1810Controller
+  controller: sensor.livingroom_remote_action
+  integration: z2m
+  light: light.livingroom_lamp
+
+livingroom_radiator:
+  module: climate
+  class: Radiator
+  window_contact: binary_sensor.livingroom_sensor_window_contact
+  day_target_temp: input_number.livingroom_day_target_temp
+  night_target_temp: input_number.night_target_temp
+  day_start_time: input_datetime.radiators_day_start
+  night_start_time: input_datetime.radiators_night_start
+  climate: climate.livingroom_radiator
+  away: input_boolean.away
+
+kitchen_radiator:
+  module: climate
+  class: Radiator
+  window_contact: binary_sensor.kitchen_sensor_window_contact
+  day_target_temp: input_number.kitchen_day_target_temp
+  night_target_temp: input_number.night_target_temp
+  day_start_time: input_datetime.radiators_day_start
+  night_start_time: input_datetime.radiators_night_start
+  climate: climate.kitchen_radiator
+  away: input_boolean.away
+
+bedroom_radiator:
+  module: climate
+  class: Radiator
+  window_contact: binary_sensor.bedroom_sensor_window_contact
+  day_target_temp: input_number.bedroom_day_target_temp
+  night_target_temp: input_number.night_target_temp
+  day_start_time: input_datetime.radiators_day_start
+  night_start_time: input_datetime.radiators_night_start
+  climate: climate.bedroom_radiator
+  away: input_boolean.away
+
+bathroom_radiator:
+  module: climate
+  class: Radiator
+  window_contact: binary_sensor.bathroom_sensor_window_contact
+  day_target_temp: input_number.bathroom_day_target_temp
+  night_target_temp: input_number.night_target_temp
+  day_start_time: input_datetime.radiators_day_start
+  night_start_time: input_datetime.radiators_night_start
+  climate: climate.bathroom_radiator
+  away: input_boolean.away
