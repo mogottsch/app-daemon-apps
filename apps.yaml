@@ -95,3 +95,37 @@ kitchen_light:
   day_illuminance: 100
   night_illuminance: 10
   illuminance_threshold: 20
+
+default_notifier:
+  module: notification
+  class: Notifier
+  mobile_targets:
+    - all_devices
+  media_players:
+    - googlehome6297
+    - googlehome6663
+    - googlehome7795
+    - moritz_zimmer
+  night_mode: input_boolean.night_mode
+  language: de-CH
+
+window_open_long:
+  module: notification
+  class: WindowOpenLong
+  notifier: default_notifier
+  dependencies: default_notifier
+  duration: 600
+  throttle_duration: 300
+  window_sensors:
+    bathroom:
+      entity_id: binary_sensor.bathroom_sensor_window_contact
+      name: Badezimmer
+    kitchen:
+      entity_id: binary_sensor.kitchen_sensor_window_contact
+      name: Küche
+    bedroom:
+      entity_id: binary_sensor.bedroom_sensor_window_contact
+      name: Schlafzimmer
+    livingroom:
+      entity_id: binary_sensor.livingroom_sensor_window_contact
+      name: Wohnzimmer
