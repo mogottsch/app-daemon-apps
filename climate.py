@@ -76,9 +76,6 @@ class Radiator(hass.Hass):
         window_is_open = self.window_is_open()
         is_away = self.is_away()
         is_night = self.is_night()
-        self.log(f"Window is open: {window_is_open}")
-        self.log(f"Is away: {is_away}")
-        self.log(f"Is night: {is_night}")
         if (self.window_is_open()):
             return self.OFF_TEMP
 
@@ -93,7 +90,7 @@ class Radiator(hass.Hass):
 
     def update_target_temp(self, *_) -> None:
         target_temp = self.calculate_target_temp()
-        self.log(f"Setting target of {self.climate_entity} to {target_temp}")
+        self.log(f"Setting target temperature to {target_temp}")
         self.set_target_temp(target_temp)
 
     def get_time(self, entity: str) -> time:

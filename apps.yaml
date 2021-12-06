@@ -62,3 +62,36 @@ bathroom_radiator:
   night_start_time: input_datetime.radiators_night_start
   climate: climate.bathroom_radiator
   away: input_boolean.away
+
+hallway_light:
+  module: illumination
+  class: Light
+  sensor_occupancy: binary_sensor.hallway_sensor_occupancy
+  sensor_illuminance: sensor.0x54ef4410000c2c1e_illuminance_lux
+  light: light.hallway_lamp_light
+  night_mode: input_boolean.night_mode
+  day_illuminance: 100
+  night_illuminance: 10
+  illuminance_threshold: 10
+
+bathroom_light:
+  module: illumination
+  class: Light
+  sensor_occupancy: input_boolean.bathroom_occupancy
+  sensor_illuminance: sensor.bathroom_brightness_sensor_illuminance_lux
+  light: light.bathroom_lamp
+  night_mode: input_boolean.night_mode
+  day_illuminance: 100
+  night_illuminance: 10
+  illuminance_threshold: 10
+
+kitchen_light:
+  module: illumination
+  class: Light
+  sensor_occupancy: binary_sensor.kitchen_sensor_occupancy
+  sensor_illuminance: sensor.kitchen_brightness_sensor_illuminance_lux
+  light: light.kitchen_lamp
+  night_mode: input_boolean.night_mode
+  day_illuminance: 100
+  night_illuminance: 10
+  illuminance_threshold: 20
