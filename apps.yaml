@@ -81,9 +81,9 @@ bathroom_light:
   sensor_illuminance: sensor.bathroom_brightness_sensor_illuminance_lux
   light: light.bathroom_lamp
   night_mode: input_boolean.night_mode
-  day_illuminance: 100
+  day_illuminance: 255
   night_illuminance: 10
-  illuminance_threshold: 10
+  illuminance_threshold: 20
 
 kitchen_light:
   module: illumination

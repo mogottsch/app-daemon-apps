@@ -15,7 +15,7 @@ class Light(hass.Hass):
         self.init_values()
         self.init_listeners()
 
-        self.turn_off("switch.livingroom_lamp_kate")
+        self.update_light_state()
 
     def init_values(self) -> None:
         self.sensor_occupancy_entity = self.args["sensor_occupancy"]
@@ -43,12 +43,14 @@ class Light(hass.Hass):
     def is_night_mode(self) -> bool:
         return self.get_state(self.night_mode_entity) == "on"
 
-    def get_current_light_state(self) -> bool:
+    def light_is_on(self) -> bool:
         return self.get_state(self.light_entity) == "on"
 
     def calculate_light_state(self) -> None:
         if not self.get_occupancy():
             return False
+        if self.light_is_on():
+            return True
         if self.get_illuminance() < self.illuminance_threshold:
             return True
         return False
@@ -60,7 +62,7 @@ class Light(hass.Hass):
 
     def update_light_state(self, *_) -> None:
         new_light_state = self.calculate_light_state()
-        if new_light_state == self.get_current_light_state():
+        if new_light_state == self.light_is_on():
             return
 
         self.log(f"light is set to {new_light_state and 'on' or 'off'}")
