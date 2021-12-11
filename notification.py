@@ -11,7 +11,6 @@ class Notifier(hass.Hass):
 
     def initialize(self) -> None:
         self.init_values()
-        self.say_message("Notification system initialized")
 
     def init_values(self) -> None:
         self.mobile_target_enities = self.args["mobile_targets"]
