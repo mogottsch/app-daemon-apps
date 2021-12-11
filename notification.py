@@ -1,16 +1,17 @@
-from typing import Dict
+from typing import Dict, List
 import hassapi as hass
 from datetime import timedelta, datetime
 
 
 class Notifier(hass.Hass):
     mobile_target_enities: list = []
-    media_player_entities: list = []
+    media_player_entities: List[Dict] = []
     language: str = None
     night_mode_entity: str = None
 
     def initialize(self) -> None:
         self.init_values()
+        self.say_message("Notification system initialized")
 
     def init_values(self) -> None:
         self.mobile_target_enities = self.args["mobile_targets"]
@@ -37,9 +38,14 @@ class Notifier(hass.Hass):
             self.log(f"Night mode is enabled, tts cancelled")
             return
 
-        for entity in self.media_player_entities:
-            self.log(f"Broadcasting message through {entity}: {message}")
-            entity_id = f"media_player.{entity}"
+        for key, entity in self.media_player_entities.items():
+            entity_id = entity["entity_id"]
+            occupancy_entity_id = entity.get("occupancy_entity_id")
+            if occupancy_entity_id and not self.is_occupied(occupancy_entity_id):
+                self.log(f"{entity_id} is not occupied, tts cancelled")
+                continue
+
+            self.log(f"Broadcasting message through {key}: {message}")
             self.call_service("tts/cloud_say",
                               entity_id=entity_id,
                               message=message,
@@ -49,6 +55,9 @@ class Notifier(hass.Hass):
         self.send_push_notification(message, title)
         if not only_push:
             self.say_message(message)
+    
+    def is_occupied(self, entity_id) -> bool:
+        return self.get_state(entity_id) == "on"
 
 
 class UseNotifier(hass.Hass):
