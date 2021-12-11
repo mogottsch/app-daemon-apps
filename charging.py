@@ -72,6 +72,8 @@ class PhoneCharger(UseNotifier):
         self.temp_listeners.append(handle_battery)
         self.temp_listeners.append(handle_stop)
 
+        self.notify(f"Ladevorgang für {detected_device['name']} gestartet")
+
     def handle_battery_threshold_reached(self, entity, attribute, old, new,
                                          kwargs) -> bool:
         if int(new) < self.CHARGING_THRESHOLD:
