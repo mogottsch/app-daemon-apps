@@ -30,8 +30,12 @@ class Light(hass.Hass):
     def init_listeners(self) -> None:
         self.listen_state(self.update_light_state,
                           self.sensor_occupancy_entity)
+
+        # maybe it would be better to regularly check the light, so that user inputs are not overwritten
+        # also use a debounce on this regular update
         self.listen_state(self.update_light_state,
-                          self.sensor_illuminance_entity)
+                          self.sensor_illuminance_entity) 
+
         self.listen_state(self.update_light_state, self.night_mode_entity)
 
     def get_illuminance(self) -> int:
@@ -60,9 +64,22 @@ class Light(hass.Hass):
             return self.night_illuminance
         return self.day_illuminance
 
+    def get_brightness(self, entity_id) -> int:
+        return int(self.get_state(entity_id, attribute="brightness"))
+
+    def update_needed(self, new_light_state) -> bool:
+        if new_light_state != self.light_is_on():
+            return True
+
+        if (not self.day_illuminance or not self.night_illuminance):
+            return False
+
+        desired_brightess = self.calculate_light_brightness()
+        return desired_brightess != self.get_brightness(self.light_entity)
+
     def update_light_state(self, *_) -> None:
         new_light_state = self.calculate_light_state()
-        if new_light_state == self.light_is_on():
+        if(not self.update_needed(new_light_state)):
             return
 
         self.log(f"light is set to {new_light_state and 'on' or 'off'}")

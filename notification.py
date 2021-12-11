@@ -16,7 +16,7 @@ class Notifier(hass.Hass):
         self.mobile_target_enities = self.args["mobile_targets"]
         self.media_player_entities = self.args["media_players"]
         self.language = self.args["language"]
-        self.night_mode_entity = self.args["night_mode_entity"]
+        self.night_mode_entity = self.args["night_mode"]
 
     def is_night(self) -> bool:
         return self.get_state(self.night_mode_entity) == "on"

@@ -16,6 +16,7 @@ class Radiator(hass.Hass):
     def initialize(self) -> None:
         self.init_values()
         self.init_listeners()
+        self.update_target_temp()
 
     def init_values(self) -> None:
         self.window_contact_entity = self.args["window_contact"]
@@ -73,9 +74,6 @@ class Radiator(hass.Hass):
         return now < day_start_time or now > night_start_time
 
     def calculate_target_temp(self) -> float:
-        window_is_open = self.window_is_open()
-        is_away = self.is_away()
-        is_night = self.is_night()
         if (self.window_is_open()):
             return self.OFF_TEMP
 
