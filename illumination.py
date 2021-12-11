@@ -71,6 +71,11 @@ class Light(hass.Hass):
         if new_light_state != self.light_is_on():
             return True
 
+        # further check if brightness adjustment is needed
+
+        if not self.light_is_on():
+            return False
+
         if (not self.day_illuminance or not self.night_illuminance):
             return False
 
