@@ -44,17 +44,23 @@ class Notifier(hass.Hass):
                 self.log(f"{entity_id} is not occupied, tts cancelled")
                 continue
 
+            if self.get_state(entity_id) == "playing":
+                self.log(f"{entity_id} is playing, tts cancelled")
+                continue
+
             self.log(f"Broadcasting message through {key}: {message}")
-            self.call_service("tts/cloud_say",
-                              entity_id=entity_id,
-                              message=message,
-                              language=self.language)
+            self.call_service(
+                "tts/cloud_say",
+                entity_id=entity_id,
+                message=message,
+                language=self.language,
+            )
 
     def notify(self, message, title=None, only_push=False) -> None:
         self.send_push_notification(message, title)
         if not only_push:
             self.say_message(message)
-    
+
     def is_occupied(self, entity_id) -> bool:
         return self.get_state(entity_id) == "on"
 
@@ -83,29 +89,60 @@ class WindowOpenLong(UseNotifier):
     def init_values(self) -> None:
         self.window_sensors = self.args["window_sensors"]
         self.duration = timedelta(seconds=self.args["duration"])
-        self.throttle_duration = timedelta(
-            seconds=self.args["throttle_duration"])
+        self.throttle_duration = timedelta(seconds=self.args["throttle_duration"])
 
     def init_listeners(self) -> None:
         for key, sensor in self.window_sensors.items():
-            self.listen_state(self.window_open_long,
-                              sensor["entity_id"],
-                              new="on",
-                              duration=self.duration.seconds)
+            self.listen_state(
+                self.window_open_long,
+                sensor["entity_id"],
+                new="on",
+                duration=self.duration.seconds,
+            )
 
     def window_open_long(self, entity, attribute, old, new, kwargs) -> None:
         name = [
-            sensor['name'] for key, sensor in self.window_sensors.items()
+            sensor["name"]
+            for key, sensor in self.window_sensors.items()
             if sensor["entity_id"] == entity
         ][0]
 
-        if self.last_notification is not None and \
-             self.last_notification + self.throttle_duration > datetime.now(
+        if (
+            self.last_notification is not None
+            and self.last_notification + self.throttle_duration > datetime.now()
         ):
             self.log(f"Notification throttled for {name}")
             return
 
         duration_minutes = int(self.duration.seconds / 60)
         self.last_notification = datetime.now()
-        self.notify(
-            f"Das Fenster im {name} is seit {duration_minutes} Minuten offen.")
+        self.notify(f"Das Fenster im {name} is seit {duration_minutes} Minuten offen.")
+
+
+class PowerDropped(UseNotifier):
+    power_sensor_entity: str
+    power_threshold: int
+    message: str
+
+    def initialize(self) -> None:
+        super().initialize()
+        self.init_values()
+        self.init_listeners()
+
+    def init_values(self) -> None:
+        self.power_sensor_entity = self.args["power_sensor"]
+        self.power_threshold = self.args["power_threshold"]
+        self.message = self.args["message"]
+
+    def init_listeners(self) -> None:
+        self.listen_state(
+            self.power_dropped,
+            self.power_sensor_entity,
+        )
+
+    def power_dropped(self, entity, attribute, old, new, kwargs) -> None:
+        self.log(f"Power dropped: {new} from {old}")
+        if int(new) > int(old) or int(new) > self.power_threshold:
+            return
+        self.log("should notify")
+        self.notify(self.message)
