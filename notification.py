@@ -2,6 +2,8 @@ from typing import Dict, List
 import hassapi as hass
 from datetime import timedelta, datetime
 
+import os
+
 
 class Notifier(hass.Hass):
     mobile_target_enities: list = []
@@ -21,13 +23,20 @@ class Notifier(hass.Hass):
     def is_night(self) -> bool:
         return self.get_state(self.night_mode_entity) == "on"
 
-    def send_push_notification(self, message, title=None) -> None:
+    def send_push_notification(self, message, title=None, tag=None) -> None:
         for entity in self.mobile_target_enities:
             self.log(f"Sending push notification to {entity}: {message}")
             service_name = f"notify/{entity}"
+
+            data = {}
+            if tag:
+                data["tag"] = tag
+
             kwargs = {
                 "message": message,
+                "data": data,
             }
+
             if title:
                 kwargs["title"] = title
             self.call_service(service_name, **kwargs)
@@ -56,10 +65,14 @@ class Notifier(hass.Hass):
                 language=self.language,
             )
 
-    def notify(self, message, title=None, only_push=False) -> None:
-        self.send_push_notification(message, title)
+    def notify(
+        self, message, title=None, only_push=False, only_say=False, tag=None
+    ) -> None:
         if not only_push:
             self.say_message(message)
+
+        if not only_say:
+            self.send_push_notification(message, title, tag)
 
     def is_occupied(self, entity_id) -> bool:
         return self.get_state(entity_id) == "on"
@@ -71,8 +84,8 @@ class UseNotifier(hass.Hass):
     def initialize(self) -> None:
         self.notifier = self.get_app(self.args["notifier"])
 
-    def notify(self, message, title=None) -> None:
-        self.notifier.notify(message, title)
+    def notify(self, *args, **kwargs) -> None:
+        self.notifier.notify(*args, **kwargs)
 
 
 class WindowOpenLong(UseNotifier):
@@ -90,6 +103,7 @@ class WindowOpenLong(UseNotifier):
         self.window_sensors = self.args["window_sensors"]
         self.duration = timedelta(seconds=self.args["duration"])
         self.throttle_duration = timedelta(seconds=self.args["throttle_duration"])
+        self.is_enabled_entity = self.args["is_enabled"]
 
     def init_listeners(self) -> None:
         for key, sensor in self.window_sensors.items():
@@ -100,7 +114,17 @@ class WindowOpenLong(UseNotifier):
                 duration=self.duration.seconds,
             )
 
+    def is_enabled(self) -> bool:
+        self.log(self.get_state(self.is_enabled_entity))
+        return self.get_state(self.is_enabled_entity) == "on"
+
     def window_open_long(self, entity, attribute, old, new, kwargs) -> None:
+        if not self.is_enabled():
+            self.log(
+                f"Notifications for {entity} are disabled through {self.is_enabled_entity}"
+            )
+            return
+
         name = [
             sensor["name"]
             for key, sensor in self.window_sensors.items()
@@ -116,7 +140,10 @@ class WindowOpenLong(UseNotifier):
 
         duration_minutes = int(self.duration.seconds / 60)
         self.last_notification = datetime.now()
-        self.notify(f"Das Fenster im {name} is seit {duration_minutes} Minuten offen.")
+        self.notify(
+            f"Das Fenster im {name} is seit {duration_minutes} Minuten offen.",
+            tag="window_open_long",
+        )
 
 
 class PowerDropped(UseNotifier):
@@ -144,5 +171,40 @@ class PowerDropped(UseNotifier):
         self.log(f"Power dropped: {new} from {old}")
         if int(new) > int(old) or int(new) > self.power_threshold:
             return
-        self.log("should notify")
-        self.notify(self.message)
+        self.notify(self.message, tag=f"power_dropped_{self.power_sensor_entity}")
+
+
+class ErrorLogged(UseNotifier):
+    def initialize(self) -> None:
+        super().initialize()
+        self.init_listeners()
+
+    def init_listeners(self) -> None:
+        self.listen_log(self.handle_error_log, level="WARNING")
+
+    def handle_error_log(self, name, ts, level, type, message, kwargs) -> None:
+        self.notify(f"Error logged: {message}", only_push=True, tag="error")
+
+
+class NotificationHAService(UseNotifier):
+    def initialize(self) -> None:
+        self.log("Initializing notification service")
+        super().initialize()
+        handle = self.listen_event(self.call_notify, "appdaemon_notify")
+
+    def call_notify(
+        self,
+        event_name,
+        data,
+        *args,
+        **kwargs,
+    ) -> None:
+        if not "message" in data:
+            raise Exception("Missing message in notification event from HA")
+        self.notify(
+            data["message"],
+            title=data.get("title", None),
+            tag=data.get("tag", None),
+            only_push=data.get("only_push", False),
+            only_say=data.get("only_say", False),
+        )

@@ -25,57 +25,57 @@ class PhoneCharger(UseNotifier):
         self.detected_device_entity = self.args["detected_device"]
 
     def init_listeners(self) -> None:
-        self.listen_state(self.handle_charger_turned_on,
-                          self.charger_entity,
-                          new="on")
+        self.listen_state(self.handle_charger_turned_on, self.charger_entity, new="on")
         for key, device in self.devices.items():
-            self.listen_state(self.handle_charging_started,
-                              device['charging'],
-                              new="on",
-                              duration=15)
+            self.listen_state(
+                self.handle_charging_started, device["charging"], new="on", duration=15
+            )
 
-    def handle_charging_started(self, entity, attribute, old, new,
-                                kwargs) -> None:
+    def handle_charging_started(self, entity, attribute, old, new, kwargs) -> None:
 
-        if self.charger_turned_on is None or \
-                (datetime.now() - self.charger_turned_on).seconds > 60:
-            self.log(
-                "Device started charging but charger not turned on recently")
+        if (
+            self.charger_turned_on is None
+            or (datetime.now() - self.charger_turned_on).seconds > 60
+        ):
+            self.log("Device started charging but charger not turned on recently")
             return
         self.set_detected_device(entity)
 
-    def handle_charger_turned_on(self, entity, attribute, old, new,
-                                 kwargs) -> None:
+    def handle_charger_turned_on(self, entity, attribute, old, new, kwargs) -> None:
         self.charger_turned_on = datetime.now()
         self.log("Charger turned on")
 
-    def handle_charger_turned_off(self, entity, attribute, old, new,
-                                  kwargs) -> None:
+    def handle_charger_turned_off(self, entity, attribute, old, new, kwargs) -> None:
         self.log("Charger turned off")
         self.stop_charging()
 
     def set_detected_device(self, charging_entity: str) -> None:
         detected_device = [
-            device for device in self.devices.values()
-            if device['charging'] == charging_entity
+            device
+            for device in self.devices.values()
+            if device["charging"] == charging_entity
         ][0]
         self.log(f"Detected device: {detected_device['name']}")
         self.detected_device = detected_device
-        self.set_detected_device_input(detected_device['name'])
+        self.set_detected_device_input(detected_device["name"])
 
         handle_battery = self.listen_state(
-            self.handle_battery_threshold_reached,
-            detected_device['battery_level'])
-        handle_stop = self.listen_state(self.handle_charging_stopped,
-                                        detected_device['charging'],
-                                        new="off")
+            self.handle_battery_threshold_reached, detected_device["battery_level"]
+        )
+        handle_stop = self.listen_state(
+            self.handle_charging_stopped, detected_device["charging"], new="off"
+        )
         self.temp_listeners.append(handle_battery)
         self.temp_listeners.append(handle_stop)
 
-        self.notify(f"Ladevorgang für {detected_device['name']} gestartet")
+        self.notify(
+            f"Ladevorgang für {detected_device['name']} gestartet",
+            tag="charging",
+        )
 
-    def handle_battery_threshold_reached(self, entity, attribute, old, new,
-                                         kwargs) -> bool:
+    def handle_battery_threshold_reached(
+        self, entity, attribute, old, new, kwargs
+    ) -> bool:
         if int(new) < self.CHARGING_THRESHOLD:
             self.log(
                 f"Battery level {new} is below threshold {self.CHARGING_THRESHOLD}"
@@ -83,12 +83,13 @@ class PhoneCharger(UseNotifier):
             return
 
         self.notify(
-            f"Ladevorgang für {self.detected_device['name']} abgeschlossen")
+            f"Ladevorgang für {self.detected_device['name']} abgeschlossen",
+            tag="charging",
+        )
         self.log(f"Battery level reached for {self.detected_device['name']}")
         self.stop_charging()
 
-    def handle_charging_stopped(self, entity, attribute, old, new,
-                                kwargs) -> None:
+    def handle_charging_stopped(self, entity, attribute, old, new, kwargs) -> None:
         self.log(f"Charging stopped for {self.detected_device['name']}")
         self.stop_charging()
 
@@ -110,6 +111,8 @@ class PhoneCharger(UseNotifier):
         self.turn_off(self.charger_entity)
 
     def set_detected_device_input(self, device_name: str) -> None:
-        self.call_service("input_text/set_value",
-                          entity_id=self.detected_device_entity,
-                          value=device_name)
+        self.call_service(
+            "input_text/set_value",
+            entity_id=self.detected_device_entity,
+            value=device_name,
+        )

@@ -1,4 +1,5 @@
 import hassapi as hass
+from datetime import datetime
 
 
 class Light(hass.Hass):
@@ -11,6 +12,8 @@ class Light(hass.Hass):
     day_illuminance: int = None
     night_illuminance: int = None
 
+    internal_light_state = None
+
     def initialize(self) -> None:
         self.init_values()
         self.init_listeners()
@@ -21,20 +24,21 @@ class Light(hass.Hass):
         self.sensor_occupancy_entity = self.args["sensor_occupancy"]
         self.sensor_illuminance_entity = self.args["sensor_illuminance"]
         self.light_entity = self.args["light"]
-        self.illuminance_threshold = int(
-            self.args.get("illuminance_threshold", 10))
+        self.illuminance_threshold = int(self.args.get("illuminance_threshold", 10))
         self.night_mode_entity = self.args["night_mode"]
         self.day_illuminance = self.args.get("day_illuminance")
         self.night_illuminance = self.args.get("night_illuminance")
+        self.manual_mode_debounce = int(self.args.get("manual_mode_debounce", 180))
+
+        self.internal_light_state = self.light_is_on()
+        self.manual_action_registered_on = None
 
     def init_listeners(self) -> None:
-        self.listen_state(self.update_light_state,
-                          self.sensor_occupancy_entity)
+        self.listen_state(self.update_light_state, self.sensor_occupancy_entity)
 
         # maybe it would be better to regularly check the light, so that user inputs are not overwritten
         # also use a debounce on this regular update
-        self.listen_state(self.update_light_state,
-                          self.sensor_illuminance_entity) 
+        self.listen_state(self.update_light_state, self.sensor_illuminance_entity)
 
         self.listen_state(self.update_light_state, self.night_mode_entity)
 
@@ -50,7 +54,7 @@ class Light(hass.Hass):
     def light_is_on(self) -> bool:
         return self.get_state(self.light_entity) == "on"
 
-    def calculate_light_state(self) -> None:
+    def calculate_light_state(self) -> bool:
         if not self.get_occupancy():
             return False
         if self.light_is_on():
@@ -68,6 +72,18 @@ class Light(hass.Hass):
         return int(self.get_state(entity_id, attribute="brightness"))
 
     def update_needed(self, new_light_state) -> bool:
+        external_light_state = self.light_is_on()
+        if external_light_state != self.internal_light_state:
+            self.manual_action_registered_on = datetime.now()
+            self.log(f"manual action registered on {self.manual_action_registered_on}")
+
+        if (
+            self.manual_action_registered_on
+            and (datetime.now() - self.manual_action_registered_on).total_seconds()
+            < self.manual_mode_debounce
+        ):
+            return False
+
         if new_light_state != self.light_is_on():
             return True
 
@@ -76,7 +92,7 @@ class Light(hass.Hass):
         if not self.light_is_on():
             return False
 
-        if (not self.day_illuminance or not self.night_illuminance):
+        if not self.day_illuminance or not self.night_illuminance:
             return False
 
         desired_brightess = self.calculate_light_brightness()
@@ -84,14 +100,16 @@ class Light(hass.Hass):
 
     def update_light_state(self, *_) -> None:
         new_light_state = self.calculate_light_state()
-        if(not self.update_needed(new_light_state)):
+        if not self.update_needed(new_light_state):
             return
 
         self.log(f"light is set to {new_light_state and 'on' or 'off'}")
 
+        self.internal_light_state = new_light_state
+
         if new_light_state:
             kwargs = {}
-            if (self.day_illuminance and self.night_illuminance):
+            if self.day_illuminance and self.night_illuminance:
                 kwargs["brightness"] = self.calculate_light_brightness()
             self.turn_on(self.light_entity, **kwargs)
             return
