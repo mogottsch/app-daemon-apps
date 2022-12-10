@@ -12,7 +12,7 @@ class Light(hass.Hass):
     day_illuminance: int = None
     night_illuminance: int = None
 
-    internal_light_state = None
+    expected_action = None
 
     def initialize(self) -> None:
         self.init_values()
@@ -30,17 +30,21 @@ class Light(hass.Hass):
         self.night_illuminance = self.args.get("night_illuminance")
         self.manual_mode_debounce = int(self.args.get("manual_mode_debounce", 180))
 
-        self.internal_light_state = self.light_is_on()
         self.manual_action_registered_on = None
 
     def init_listeners(self) -> None:
         self.listen_state(self.update_light_state, self.sensor_occupancy_entity)
-
-        # maybe it would be better to regularly check the light, so that user inputs are not overwritten
-        # also use a debounce on this regular update
         self.listen_state(self.update_light_state, self.sensor_illuminance_entity)
-
         self.listen_state(self.update_light_state, self.night_mode_entity)
+        self.listen_state(self.handle_light_change, self.light_entity)
+
+    def handle_light_change(self, entity, attribute, old, new, *kwargs) -> None:
+        if new == self.expected_action:
+            self.expected_action = None
+            return
+        self.manual_action_registered_on = datetime.now()
+        self.log(f"manual action registered on {self.manual_action_registered_on}")
+        self.run_in(self.update_light_state, self.manual_mode_debounce)
 
     def get_illuminance(self) -> int:
         return int(self.get_state(self.sensor_illuminance_entity))
@@ -72,11 +76,6 @@ class Light(hass.Hass):
         return int(self.get_state(entity_id, attribute="brightness"))
 
     def update_needed(self, new_light_state) -> bool:
-        external_light_state = self.light_is_on()
-        if external_light_state != self.internal_light_state:
-            self.manual_action_registered_on = datetime.now()
-            self.log(f"manual action registered on {self.manual_action_registered_on}")
-
         if (
             self.manual_action_registered_on
             and (datetime.now() - self.manual_action_registered_on).total_seconds()
@@ -105,7 +104,7 @@ class Light(hass.Hass):
 
         self.log(f"light is set to {new_light_state and 'on' or 'off'}")
 
-        self.internal_light_state = new_light_state
+        self.expected_action = new_light_state and "on" or "off"
 
         if new_light_state:
             kwargs = {}
