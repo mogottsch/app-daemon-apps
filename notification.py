@@ -2,14 +2,13 @@ from typing import Dict, List
 import hassapi as hass
 from datetime import timedelta, datetime
 
-import os
-
 
 class Notifier(hass.Hass):
     mobile_target_enities: list = []
     media_player_entities: List[Dict] = []
     language: str = None
     night_mode_entity: str = None
+    guest_sleeping_entity: str = None
 
     def initialize(self) -> None:
         self.init_values()
@@ -19,9 +18,13 @@ class Notifier(hass.Hass):
         self.media_player_entities = self.args["media_players"]
         self.language = self.args["language"]
         self.night_mode_entity = self.args["night_mode"]
+        self.guest_sleeping_entity = self.args["guest_sleeping"]
 
     def is_night(self) -> bool:
         return self.get_state(self.night_mode_entity) == "on"
+
+    def is_guest_sleeping(self) -> bool:
+        return self.get_state(self.guest_sleeping_entity) == "on"
 
     def send_push_notification(self, message, title=None, tag=None) -> None:
         for entity in self.mobile_target_enities:
@@ -44,6 +47,10 @@ class Notifier(hass.Hass):
     def say_message(self, message) -> None:
         if self.is_night():
             self.log(f"Night mode is enabled, tts cancelled")
+            return
+
+        if self.is_guest_sleeping():
+            self.log(f"Guest is sleeping, tts cancelled")
             return
 
         for key, entity in self.media_player_entities.items():

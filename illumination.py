@@ -1,16 +1,18 @@
+from typing import Optional
 import hassapi as hass
 from datetime import datetime
 
 
 class Light(hass.Hass):
-    sensor_occupancy_entity: str = None
-    sensor_illuminance_entity: str = None
-    light_entity: str = None
-    illuminance_threshold: int = None
-    night_mode_entity: str = None
+    sensor_occupancy_entity: str = ""
+    sensor_illuminance_entity: str = ""
+    light_entity: str = ""
+    illuminance_threshold: int = 10
+    night_mode_entity: str = ""
+    disabled_entity: Optional[str] = None
 
-    day_illuminance: int = None
-    night_illuminance: int = None
+    day_illuminance: int = 255
+    night_illuminance: int = 10
 
     expected_action = None
 
@@ -29,6 +31,7 @@ class Light(hass.Hass):
         self.day_illuminance = self.args.get("day_illuminance")
         self.night_illuminance = self.args.get("night_illuminance")
         self.manual_mode_debounce = int(self.args.get("manual_mode_debounce", 180))
+        self.disabled_entity = self.args.get("disabled")
 
         self.manual_action_registered_on = None
 
@@ -37,6 +40,11 @@ class Light(hass.Hass):
         self.listen_state(self.update_light_state, self.sensor_illuminance_entity)
         self.listen_state(self.update_light_state, self.night_mode_entity)
         self.listen_state(self.handle_light_change, self.light_entity)
+
+    def is_disabled(self) -> bool:
+        if not self.disabled_entity:
+            return False
+        return self.get_state(self.disabled_entity) == "on"
 
     def handle_light_change(self, entity, attribute, old, new, *kwargs) -> None:
         if new == self.expected_action:
@@ -59,6 +67,8 @@ class Light(hass.Hass):
         return self.get_state(self.light_entity) == "on"
 
     def calculate_light_state(self) -> bool:
+        if self.is_disabled():
+            return False
         if not self.get_occupancy():
             return False
         if self.light_is_on():
@@ -98,15 +108,15 @@ class Light(hass.Hass):
         return desired_brightess != self.get_brightness(self.light_entity)
 
     def update_light_state(self, *_) -> None:
-        new_light_state = self.calculate_light_state()
-        if not self.update_needed(new_light_state):
+        should_light_on = self.calculate_light_state()
+        if not self.update_needed(should_light_on):
             return
 
-        self.log(f"light is set to {new_light_state and 'on' or 'off'}")
+        self.log(f"light is set to {should_light_on and 'on' or 'off'}")
 
-        self.expected_action = new_light_state and "on" or "off"
+        self.expected_action = should_light_on and "on" or "off"
 
-        if new_light_state:
+        if should_light_on:
             kwargs = {}
             if self.day_illuminance and self.night_illuminance:
                 kwargs["brightness"] = self.calculate_light_brightness()
