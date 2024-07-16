@@ -28,10 +28,17 @@ class BathroomCeilingLight(hass.Hass):
         self.chill_mode_entity = self.args["chill_mode"]
         self.day_illuminance = self.args["day_illuminance"]
         self.night_illuminance = self.args["night_illuminance"]
-        self.normal_temperature = self.args["normal_temperature"]
-        self.chill_temperature = self.args["chill_temperature"]
+        self.normal_temperature = self.args.get("normal_temperature")
+        self.chill_temperature = self.args.get("chill_temperature")
         self.manual_mode_debounce = int(self.args.get("manual_mode_debounce", 180))
         self.disabled_entity = self.args.get("disabled")
+
+        self.has_temperature = (
+            self.normal_temperature is not None and self.chill_temperature is not None
+        )
+        self.has_illuminance = (
+            self.day_illuminance is not None and self.night_illuminance is not None
+        )
 
         self.manual_action_registered_on = None
 
@@ -110,24 +117,21 @@ class BathroomCeilingLight(hass.Hass):
             self.log("light is off - no need to check for brightness")
             return False
 
-        if self.day_illuminance is None or self.night_illuminance is None:
-            self.log("illuminance not set - no update needed")
-            return False
+        if self.has_illuminance:
+            desired_brightess = self.calculate_light_brightness()
+            if desired_brightess != self.get_brightness(self.light_entity):
+                self.log("brightness mismatch - update needed")
+                return True
 
-        desired_brightess = self.calculate_light_brightness()
-        if desired_brightess != self.get_brightness(self.light_entity):
-            self.log("brightness mismatch - update needed")
-            return True
-
-        desired_temperature = self.calculate_light_temperature()
-        if desired_temperature != self.get_temperature(self.light_entity):
-            self.log("temperature mismatch - update needed")
-            return True
+        if self.has_temperature:
+            desired_temperature = self.calculate_light_temperature()
+            if desired_temperature != self.get_temperature(self.light_entity):
+                self.log("temperature mismatch - update needed")
+                return True
         return False
 
     def update_light_state(self, *_) -> None:
         should_light_on = self.calculate_light_state()
-        self.log(should_light_on)
         self.log(f"light should be {should_light_on and 'on' or 'off'}")
         if not self.update_needed(should_light_on):
             self.log("no update needed")
@@ -140,7 +144,8 @@ class BathroomCeilingLight(hass.Hass):
         if should_light_on:
             kwargs = {}
             kwargs["brightness"] = self.calculate_light_brightness()
-            kwargs["color_temp"] = self.calculate_light_temperature()
+            if self.has_temperature:
+                kwargs["color_temp"] = self.calculate_light_temperature()
             # self.log(
             #     f"setting light on with brightness {kwargs['brightness']} and temperature {kwargs['color_temp']}"
             # )
